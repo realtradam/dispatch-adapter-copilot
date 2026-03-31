@@ -69,7 +69,7 @@ An abstract base class that all adapters must subclass.
 - `chat(messages, system: nil, tools: [], stream: false, max_tokens: nil, &block)` — Send a chat completion request.
   - `messages` — `Array<Message>` (canonical structs, not raw hashes).
   - `system:` — `String` or `nil`. System prompt. Adapters handle placement differences (Claude: top-level param; Copilot/OpenAI: system role message).
-  - `tools:` — `Array<ToolDefinition>`. Tools available to the model. Empty = no tools.
+  - `tools:` — `Array<ToolDefinition>` or `Array<Hash>`. Tools available to the model. Empty = no tools. Accepts both `ToolDefinition` structs and plain hashes with `name`, `description`, `parameters` keys (duck-typed — `Registry#to_a` returns plain hashes to avoid cross-gem dependency).
   - `stream:` — `Boolean`. If `true`, yields `StreamDelta` objects to the block.
   - `max_tokens:` — `Integer` or `nil`. Per-call override of the constructor default.
   - **Return:** `Dispatch::Adapter::Response`.
@@ -172,7 +172,7 @@ The Copilot adapter maps HTTP status codes to these error classes.
 
 - The adapter interface will be extracted into its own gem post-MVP (Phase 7). For now it lives here.
 - Streaming support is required for ActionCable relay in the Rails app.
-- All adapters accept and return canonical structs (`Message`, `Response`, `ToolUseBlock`, etc.) — not raw hashes.
+- All adapters accept and return canonical structs (`Message`, `Response`, `ToolUseBlock`, etc.) — not raw hashes. **Exception:** the `tools:` parameter on `chat` accepts both `ToolDefinition` structs and plain hashes (duck-typed on `name`/`description`/`parameters`), since `Registry#to_a` returns plain hashes to avoid a cross-gem dependency.
 - The response format is consistent regardless of which adapter is used — the Rails agent loop depends on it.
 - Thread-safety: adapters may be called from multiple GoodJob workers concurrently. Ensure no shared mutable state.
 - `system:` is a separate parameter on `chat`, not a message role. Adapters handle placement internally.

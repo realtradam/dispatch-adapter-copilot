@@ -2,7 +2,7 @@
 
 module Dispatch
   module Adapter
-    module Copilot
+    module CopilotVersion
       VERSION = "0.1.0"
     end
   end
