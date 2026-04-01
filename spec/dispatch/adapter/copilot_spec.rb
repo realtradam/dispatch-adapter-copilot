@@ -21,9 +21,9 @@ RSpec.describe Dispatch::Adapter::Copilot do
       .to_return(
         status: 200,
         body: JSON.generate({
-          "token" => copilot_token,
-          "expires_at" => (Time.now.to_i + 3600)
-        }),
+                              "token" => copilot_token,
+                              "expires_at" => (Time.now.to_i + 3600)
+                            }),
         headers: { "Content-Type" => "application/json" }
       )
   end
@@ -36,7 +36,7 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
   describe "VERSION" do
     it "is accessible" do
-      expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.1.0")
+      expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.2.0")
     end
   end
 
@@ -70,15 +70,15 @@ RSpec.describe Dispatch::Adapter::Copilot do
           .to_return(
             status: 200,
             body: JSON.generate({
-              "id" => "chatcmpl-123",
-              "model" => "gpt-4.1",
-              "choices" => [{
-                "index" => 0,
-                "message" => { "role" => "assistant", "content" => "Hello there!" },
-                "finish_reason" => "stop"
-              }],
-              "usage" => { "prompt_tokens" => 10, "completion_tokens" => 5 }
-            }),
+                                  "id" => "chatcmpl-123",
+                                  "model" => "gpt-4.1",
+                                  "choices" => [{
+                                    "index" => 0,
+                                    "message" => { "role" => "assistant", "content" => "Hello there!" },
+                                    "finish_reason" => "stop"
+                                  }],
+                                  "usage" => { "prompt_tokens" => 10, "completion_tokens" => 5 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
       end
@@ -103,26 +103,26 @@ RSpec.describe Dispatch::Adapter::Copilot do
           .to_return(
             status: 200,
             body: JSON.generate({
-              "id" => "chatcmpl-456",
-              "model" => "gpt-4.1",
-              "choices" => [{
-                "index" => 0,
-                "message" => {
-                  "role" => "assistant",
-                  "content" => nil,
-                  "tool_calls" => [{
-                    "id" => "call_abc",
-                    "type" => "function",
-                    "function" => {
-                      "name" => "get_weather",
-                      "arguments" => '{"city":"New York"}'
-                    }
-                  }]
-                },
-                "finish_reason" => "tool_calls"
-              }],
-              "usage" => { "prompt_tokens" => 15, "completion_tokens" => 10 }
-            }),
+                                  "id" => "chatcmpl-456",
+                                  "model" => "gpt-4.1",
+                                  "choices" => [{
+                                    "index" => 0,
+                                    "message" => {
+                                      "role" => "assistant",
+                                      "content" => nil,
+                                      "tool_calls" => [{
+                                        "id" => "call_abc",
+                                        "type" => "function",
+                                        "function" => {
+                                          "name" => "get_weather",
+                                          "arguments" => '{"city":"New York"}'
+                                        }
+                                      }]
+                                    },
+                                    "finish_reason" => "tool_calls"
+                                  }],
+                                  "usage" => { "prompt_tokens" => 15, "completion_tokens" => 10 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
       end
@@ -149,28 +149,28 @@ RSpec.describe Dispatch::Adapter::Copilot do
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{
-                "index" => 0,
-                "message" => {
-                  "role" => "assistant",
-                  "content" => nil,
-                  "tool_calls" => [
-                    {
-                      "id" => "call_1",
-                      "type" => "function",
-                      "function" => { "name" => "get_weather", "arguments" => '{"city":"NYC"}' }
-                    },
-                    {
-                      "id" => "call_2",
-                      "type" => "function",
-                      "function" => { "name" => "get_time", "arguments" => '{"timezone":"EST"}' }
-                    }
-                  ]
-                },
-                "finish_reason" => "tool_calls"
-              }],
-              "usage" => { "prompt_tokens" => 20, "completion_tokens" => 15 }
-            }),
+                                  "choices" => [{
+                                    "index" => 0,
+                                    "message" => {
+                                      "role" => "assistant",
+                                      "content" => nil,
+                                      "tool_calls" => [
+                                        {
+                                          "id" => "call_1",
+                                          "type" => "function",
+                                          "function" => { "name" => "get_weather", "arguments" => '{"city":"NYC"}' }
+                                        },
+                                        {
+                                          "id" => "call_2",
+                                          "type" => "function",
+                                          "function" => { "name" => "get_time", "arguments" => '{"timezone":"EST"}' }
+                                        }
+                                      ]
+                                    },
+                                    "finish_reason" => "tool_calls"
+                                  }],
+                                  "usage" => { "prompt_tokens" => 20, "completion_tokens" => 15 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
       end
@@ -194,26 +194,26 @@ RSpec.describe Dispatch::Adapter::Copilot do
           .to_return(
             status: 200,
             body: JSON.generate({
-              "id" => "chatcmpl-789",
-              "model" => "gpt-4.1",
-              "choices" => [{
-                "index" => 0,
-                "message" => {
-                  "role" => "assistant",
-                  "content" => "Let me check that for you.",
-                  "tool_calls" => [{
-                    "id" => "call_def",
-                    "type" => "function",
-                    "function" => {
-                      "name" => "search",
-                      "arguments" => '{"query":"Ruby gems"}'
-                    }
-                  }]
-                },
-                "finish_reason" => "tool_calls"
-              }],
-              "usage" => { "prompt_tokens" => 20, "completion_tokens" => 15 }
-            }),
+                                  "id" => "chatcmpl-789",
+                                  "model" => "gpt-4.1",
+                                  "choices" => [{
+                                    "index" => 0,
+                                    "message" => {
+                                      "role" => "assistant",
+                                      "content" => "Let me check that for you.",
+                                      "tool_calls" => [{
+                                        "id" => "call_def",
+                                        "type" => "function",
+                                        "function" => {
+                                          "name" => "search",
+                                          "arguments" => '{"query":"Ruby gems"}'
+                                        }
+                                      }]
+                                    },
+                                    "finish_reason" => "tool_calls"
+                                  }],
+                                  "usage" => { "prompt_tokens" => 20, "completion_tokens" => 15 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
       end
@@ -231,16 +231,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
     context "with system: parameter" do
       it "prepends system message in the wire format" do
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["messages"].first == { "role" => "system", "content" => "You are helpful." }
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["messages"].first == { "role" => "system", "content" => "You are helpful." }
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "OK" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "OK" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -254,16 +254,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
     context "with max_tokens: per-call override" do
       it "uses per-call max_tokens over constructor default" do
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["max_tokens"] == 100
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["max_tokens"] == 100
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "short" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "short" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -275,16 +275,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
       it "uses constructor default when max_tokens not specified" do
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["max_tokens"] == 4096
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["max_tokens"] == 4096
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -304,23 +304,23 @@ RSpec.describe Dispatch::Adapter::Copilot do
         )
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["tools"] == [{
-              "type" => "function",
-              "function" => {
-                "name" => "get_weather",
-                "description" => "Get weather for a city",
-                "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
-              }
-            }]
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["tools"] == [{
+                   "type" => "function",
+                   "function" => {
+                     "name" => "get_weather",
+                     "description" => "Get weather for a city",
+                     "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
+                   }
+                 }]
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -338,23 +338,23 @@ RSpec.describe Dispatch::Adapter::Copilot do
         }
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["tools"] == [{
-              "type" => "function",
-              "function" => {
-                "name" => "get_weather",
-                "description" => "Get weather for a city",
-                "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
-              }
-            }]
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["tools"] == [{
+                   "type" => "function",
+                   "function" => {
+                     "name" => "get_weather",
+                     "description" => "Get weather for a city",
+                     "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
+                   }
+                 }]
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -372,23 +372,23 @@ RSpec.describe Dispatch::Adapter::Copilot do
         }
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["tools"] == [{
-              "type" => "function",
-              "function" => {
-                "name" => "get_weather",
-                "description" => "Get weather for a city",
-                "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
-              }
-            }]
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["tools"] == [{
+                   "type" => "function",
+                   "function" => {
+                     "name" => "get_weather",
+                     "description" => "Get weather for a city",
+                     "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
+                   }
+                 }]
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -411,18 +411,18 @@ RSpec.describe Dispatch::Adapter::Copilot do
         }
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["tools"].size == 2 &&
-              body["tools"][0]["function"]["name"] == "get_weather" &&
-              body["tools"][1]["function"]["name"] == "get_time"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["tools"].size == 2 &&
+                   body["tools"][0]["function"]["name"] == "get_weather" &&
+                   body["tools"][1]["function"]["name"] == "get_time"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -434,16 +434,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
       it "does not include tools key when tools array is empty" do
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            !body.key?("tools")
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 !body.key?("tools")
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -470,26 +470,27 @@ RSpec.describe Dispatch::Adapter::Copilot do
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            msgs = body["messages"]
-            # user message
-            msgs[0]["role"] == "user" &&
-              # assistant with tool_calls
-              msgs[1]["role"] == "assistant" &&
-              msgs[1]["tool_calls"].is_a?(Array) &&
-              msgs[1]["tool_calls"][0]["id"] == "call_1" &&
-              # tool result
-              msgs[2]["role"] == "tool" &&
-              msgs[2]["tool_call_id"] == "call_1" &&
-              msgs[2]["content"] == "72F and sunny"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 msgs = body["messages"]
+                 # user message
+                 msgs[0]["role"] == "user" &&
+                   # assistant with tool_calls
+                   msgs[1]["role"] == "assistant" &&
+                   msgs[1]["tool_calls"].is_a?(Array) &&
+                   msgs[1]["tool_calls"][0]["id"] == "call_1" &&
+                   # tool result
+                   msgs[2]["role"] == "tool" &&
+                   msgs[2]["tool_call_id"] == "call_1" &&
+                   msgs[2]["content"] == "72F and sunny"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "It's 72F and sunny in NYC!" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 20, "completion_tokens" => 10 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "It's 72F and sunny in NYC!" },
+                                                  "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 20, "completion_tokens" => 10 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -516,17 +517,17 @@ RSpec.describe Dispatch::Adapter::Copilot do
         messages = [Dispatch::Adapter::Message.new(role: "user", content: text_blocks)]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            msgs = body["messages"]
-            msgs[0]["content"] == "First paragraph.\nSecond paragraph."
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 msgs = body["messages"]
+                 msgs[0]["content"] == "First paragraph.\nSecond paragraph."
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -555,18 +556,18 @@ RSpec.describe Dispatch::Adapter::Copilot do
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            msgs = body["messages"]
-            tool_msg = msgs.find { |m| m["role"] == "tool" }
-            tool_msg && tool_msg["content"] == "Result line 1\nResult line 2"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 msgs = body["messages"]
+                 tool_msg = msgs.find { |m| m["role"] == "tool" }
+                 tool_msg && tool_msg["content"] == "Result line 1\nResult line 2"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 10, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 10, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -591,18 +592,19 @@ RSpec.describe Dispatch::Adapter::Copilot do
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            msgs = body["messages"]
-            tool_msg = msgs.find { |m| m["role"] == "tool" }
-            tool_msg && tool_msg["content"] == "Something went wrong" && tool_msg["tool_call_id"] == "call_err"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 msgs = body["messages"]
+                 tool_msg = msgs.find { |m| m["role"] == "tool" }
+                 tool_msg && tool_msg["content"] == "Something went wrong" && tool_msg["tool_call_id"] == "call_err"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "I see the error" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 10, "completion_tokens" => 3 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "I see the error" },
+                                                  "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 10, "completion_tokens" => 3 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -617,12 +619,12 @@ RSpec.describe Dispatch::Adapter::Copilot do
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{
-                "message" => { "content" => "truncated output..." },
-                "finish_reason" => "length"
-              }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 100 }
-            }),
+                                  "choices" => [{
+                                    "message" => { "content" => "truncated output..." },
+                                    "finish_reason" => "length"
+                                  }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 100 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -647,21 +649,21 @@ RSpec.describe Dispatch::Adapter::Copilot do
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            msgs = body["messages"]
-            assistant = msgs.find { |m| m["role"] == "assistant" }
-            assistant &&
-              assistant["content"] == "Checking..." &&
-              assistant["tool_calls"].is_a?(Array) &&
-              assistant["tool_calls"][0]["id"] == "call_mixed"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 msgs = body["messages"]
+                 assistant = msgs.find { |m| m["role"] == "assistant" }
+                 assistant &&
+                   assistant["content"] == "Checking..." &&
+                   assistant["tool_calls"].is_a?(Array) &&
+                   assistant["tool_calls"][0]["id"] == "call_mixed"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 10, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 10, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -678,17 +680,17 @@ RSpec.describe Dispatch::Adapter::Copilot do
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            msgs = body["messages"]
-            msgs.size == 1 && msgs[0]["role"] == "user" && msgs[0]["content"].include?("First") && msgs[0]["content"].include?("Second")
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 msgs = body["messages"]
+                 msgs.size == 1 && msgs[0]["role"] == "user" && msgs[0]["content"].include?("First") && msgs[0]["content"].include?("Second")
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -700,16 +702,17 @@ RSpec.describe Dispatch::Adapter::Copilot do
     context "with thinking: parameter" do
       it "sends reasoning_effort in the request body" do
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["reasoning_effort"] == "high"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["reasoning_effort"] == "high"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "thought deeply" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 3 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "thought deeply" },
+                                                  "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 3 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -728,16 +731,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
         )
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["reasoning_effort"] == "medium"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["reasoning_effort"] == "medium"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -756,16 +759,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
         )
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            body["reasoning_effort"] == "low"
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["reasoning_effort"] == "low"
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -777,16 +780,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
       it "does not send reasoning_effort when thinking is nil" do
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            !body.key?("reasoning_effort")
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 !body.key?("reasoning_effort")
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -797,16 +800,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
       end
 
       it "raises ArgumentError for invalid thinking level" do
-        expect {
+        expect do
           described_class.new(model: "o3", github_token: github_token, thinking: "extreme")
-        }.to raise_error(ArgumentError, /Invalid thinking level/)
+        end.to raise_error(ArgumentError, /Invalid thinking level/)
       end
 
       it "raises ArgumentError for invalid per-call thinking level" do
         messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
-        expect {
+        expect do
           adapter.chat(messages, thinking: "extreme")
-        }.to raise_error(ArgumentError, /Invalid thinking level/)
+        end.to raise_error(ArgumentError, /Invalid thinking level/)
       end
 
       it "allows disabling constructor default with nil per-call" do
@@ -818,16 +821,16 @@ RSpec.describe Dispatch::Adapter::Copilot do
         )
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-          .with { |req|
-            body = JSON.parse(req.body)
-            !body.key?("reasoning_effort")
-          }
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 !body.key?("reasoning_effort")
+               end
           .to_return(
             status: 200,
             body: JSON.generate({
-              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-            }),
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                }),
             headers: { "Content-Type" => "application/json" }
           )
 
@@ -844,7 +847,8 @@ RSpec.describe Dispatch::Adapter::Copilot do
       sse_body = [
         "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => "Hello" }, "index" => 0 }] })}\n\n",
         "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => " world" }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }], "usage" => { "prompt_tokens" => 5, "completion_tokens" => 2 } })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }],
+                                 "usage" => { "prompt_tokens" => 5, "completion_tokens" => 2 } })}\n\n",
         "data: [DONE]\n\n"
       ].join
 
@@ -873,10 +877,20 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
     it "yields tool_use_start and tool_use_delta for tool call streams" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 0, "id" => "call_1", "type" => "function", "function" => { "name" => "search", "arguments" => "" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 0, "function" => { "arguments" => "{\"q\":" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 0, "function" => { "arguments" => "\"test\"}" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "tool_calls" }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0, "id" => "call_1", "type" => "function",
+                                                                 "function" => { "name" => "search", "arguments" => "" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0,
+                                                                 "function" => { "arguments" => "{\"q\":" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0,
+                                                                 "function" => { "arguments" => "\"test\"}" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0,
+                                                 "finish_reason" => "tool_calls" }] })}\n\n",
         "data: [DONE]\n\n"
       ].join
 
@@ -909,7 +923,8 @@ RSpec.describe Dispatch::Adapter::Copilot do
     it "captures usage from streaming response" do
       sse_body = [
         "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => "hi" }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }], "usage" => { "prompt_tokens" => 42, "completion_tokens" => 7 } })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }],
+                                 "usage" => { "prompt_tokens" => 42, "completion_tokens" => 7 } })}\n\n",
         "data: [DONE]\n\n"
       ].join
 
@@ -929,11 +944,24 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
     it "handles multiple parallel tool calls in a stream" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 0, "id" => "call_a", "type" => "function", "function" => { "name" => "tool_a", "arguments" => "" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 1, "id" => "call_b", "type" => "function", "function" => { "name" => "tool_b", "arguments" => "" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 0, "function" => { "arguments" => "{\"x\":1}" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => { "tool_calls" => [{ "index" => 1, "function" => { "arguments" => "{\"y\":2}" } }] }, "index" => 0 }] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "tool_calls" }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0, "id" => "call_a", "type" => "function",
+                                                                 "function" => { "name" => "tool_a", "arguments" => "" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 1, "id" => "call_b", "type" => "function",
+                                                                 "function" => { "name" => "tool_b", "arguments" => "" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0,
+                                                                 "function" => { "arguments" => "{\"x\":1}" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 1,
+                                                                 "function" => { "arguments" => "{\"y\":2}" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0,
+                                                 "finish_reason" => "tool_calls" }] })}\n\n",
         "data: [DONE]\n\n"
       ].join
 
@@ -960,21 +988,22 @@ RSpec.describe Dispatch::Adapter::Copilot do
   describe "authentication" do
     it "reuses cached Copilot token for subsequent requests" do
       token_stub = stub_request(:get, "https://api.github.com/copilot_internal/v2/token")
-        .to_return(
-          status: 200,
-          body: JSON.generate({ "token" => copilot_token, "expires_at" => (Time.now.to_i + 3600) }),
-          headers: { "Content-Type" => "application/json" }
-        )
+                   .to_return(
+                     status: 200,
+                     body: JSON.generate({ "token" => copilot_token, "expires_at" => (Time.now.to_i + 3600) }),
+                     headers: { "Content-Type" => "application/json" }
+                   )
 
       chat_stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
-        .to_return(
-          status: 200,
-          body: JSON.generate({
-            "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
-            "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
-          }),
-          headers: { "Content-Type" => "application/json" }
-        )
+                  .to_return(
+                    status: 200,
+                    body: JSON.generate({
+                                          "choices" => [{ "message" => { "content" => "ok" },
+                                                          "finish_reason" => "stop" }],
+                                          "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                                        }),
+                    headers: { "Content-Type" => "application/json" }
+                  )
 
       messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       adapter.chat(messages)
@@ -1007,11 +1036,11 @@ RSpec.describe Dispatch::Adapter::Copilot do
         .to_return(
           status: 200,
           body: JSON.generate({
-            "data" => [
-              { "id" => "gpt-4.1", "object" => "model" },
-              { "id" => "gpt-4o", "object" => "model" }
-            ]
-          }),
+                                "data" => [
+                                  { "id" => "gpt-4.1", "object" => "model" },
+                                  { "id" => "gpt-4o", "object" => "model" }
+                                ]
+                              }),
           headers: { "Content-Type" => "application/json" }
         )
 

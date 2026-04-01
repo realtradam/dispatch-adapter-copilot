@@ -12,6 +12,7 @@ require_relative "response"
 require_relative "tool_definition"
 require_relative "model_info"
 require_relative "base"
+require_relative "rate_limiter"
 
 require_relative "version"
 
@@ -55,7 +56,8 @@ module Dispatch
 
       VALID_THINKING_LEVELS = %w[low medium high].freeze
 
-      def initialize(model: "gpt-4.1", github_token: nil, token_path: nil, max_tokens: 8192, thinking: nil)
+      def initialize(model: "gpt-4.1", github_token: nil, token_path: nil, max_tokens: 8192, thinking: nil,
+                     min_request_interval: 3.0, rate_limit: nil)
         super()
         @model = model
         @github_token = github_token
@@ -66,9 +68,16 @@ module Dispatch
         @copilot_token_expires_at = 0
         @mutex = Mutex.new
         validate_thinking_level!(@default_thinking)
+
+        rate_limit_path = File.join(File.dirname(@token_path), "copilot_rate_limit")
+        @rate_limiter = RateLimiter.new(
+          rate_limit_path: rate_limit_path,
+          min_request_interval: min_request_interval,
+          rate_limit: rate_limit
+        )
       end
 
-      def chat(messages, system: nil, tools: [], stream: false, max_tokens: nil, thinking: :default, &block)
+      def chat(messages, system: nil, tools: [], stream: false, max_tokens: nil, thinking: :default, &)
         ensure_authenticated!
         wire_messages = build_wire_messages(messages, system)
         wire_tools = build_wire_tools(tools)
@@ -86,7 +95,7 @@ module Dispatch
         body[:reasoning_effort] = effective_thinking if effective_thinking
 
         if stream
-          chat_streaming(body, &block)
+          chat_streaming(body, &)
         else
           chat_non_streaming(body)
         end
@@ -106,6 +115,7 @@ module Dispatch
 
       def list_models
         ensure_authenticated!
+        @rate_limiter.wait!
         uri = URI("#{API_BASE}/v1/models")
         request = Net::HTTP::Get.new(uri)
         apply_headers!(request)
@@ -133,7 +143,8 @@ module Dispatch
 
         return if VALID_THINKING_LEVELS.include?(level)
 
-        raise ArgumentError, "Invalid thinking level: #{level.inspect}. Must be one of: #{VALID_THINKING_LEVELS.join(", ")}, or nil"
+        raise ArgumentError,
+              "Invalid thinking level: #{level.inspect}. Must be one of: #{VALID_THINKING_LEVELS.join(", ")}, or nil"
       end
 
       def default_token_path
@@ -184,10 +195,10 @@ module Dispatch
         verification_uri = data["verification_uri"]
         interval = (data["interval"] || 5).to_i
 
-        $stderr.puts "\n=== GitHub Device Authorization ==="
-        $stderr.puts "Open: #{verification_uri}"
-        $stderr.puts "Enter code: #{user_code}"
-        $stderr.puts "Waiting for authorization...\n\n"
+        warn "\n=== GitHub Device Authorization ==="
+        warn "Open: #{verification_uri}"
+        warn "Enter code: #{user_code}"
+        warn "Waiting for authorization...\n\n"
 
         poll_for_access_token(device_code, interval)
       end
@@ -273,7 +284,7 @@ module Dispatch
         )
       end
 
-      def execute_streaming_request(uri, request, &block)
+      def execute_streaming_request(uri, request)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = (uri.scheme == "https")
         http.open_timeout = 30
@@ -282,7 +293,7 @@ module Dispatch
         http.start do |h|
           h.request(request) do |response|
             handle_error_response!(response) unless response.is_a?(Net::HTTPSuccess)
-            block.call(response)
+            yield(response)
           end
         end
       rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ETIMEDOUT,
@@ -456,6 +467,7 @@ module Dispatch
       # --- Chat (non-streaming) ---
 
       def chat_non_streaming(body)
+        @rate_limiter.wait!
         uri = URI("#{API_BASE}/chat/completions")
         request = Net::HTTP::Post.new(uri)
         apply_headers!(request)
@@ -522,6 +534,7 @@ module Dispatch
       # --- Chat (streaming) ---
 
       def chat_streaming(body, &block)
+        @rate_limiter.wait!
         uri = URI("#{API_BASE}/chat/completions")
         request = Net::HTTP::Post.new(uri)
         apply_headers!(request)
@@ -552,7 +565,7 @@ module Dispatch
         }
       end
 
-      def process_sse_buffer(buffer, collected, &block)
+      def process_sse_buffer(buffer, collected, &)
         while (line_end = buffer.index("\n"))
           line = buffer.slice!(0..line_end).strip
           next if line.empty?
@@ -562,14 +575,14 @@ module Dispatch
           next if data_str == "[DONE]"
 
           data = JSON.parse(data_str)
-          process_stream_chunk(data, collected, &block)
+          process_stream_chunk(data, collected, &)
         end
       rescue JSON::ParserError
         # Incomplete JSON chunk, will be completed on next read
         nil
       end
 
-      def process_stream_chunk(data, collected, &block)
+      def process_stream_chunk(data, collected, &)
         collected[:model] = data["model"] if data["model"]
 
         choice = data.dig("choices", 0)
@@ -578,20 +591,20 @@ module Dispatch
         collected[:finish_reason] = choice["finish_reason"] if choice["finish_reason"]
         delta = choice["delta"] || {}
 
-        process_text_delta(delta, collected, &block)
-        process_tool_call_deltas(delta, collected, &block)
+        process_text_delta(delta, collected, &)
+        process_tool_call_deltas(delta, collected, &)
 
         process_usage(data, collected)
       end
 
-      def process_text_delta(delta, collected, &block)
+      def process_text_delta(delta, collected)
         return unless delta["content"]
 
         collected[:content] << delta["content"]
-        block.call(StreamDelta.new(type: :text_delta, text: delta["content"]))
+        yield(StreamDelta.new(type: :text_delta, text: delta["content"]))
       end
 
-      def process_tool_call_deltas(delta, collected, &block)
+      def process_tool_call_deltas(delta, collected)
         return unless delta["tool_calls"]
 
         delta["tool_calls"].each do |tc_delta|
@@ -601,7 +614,7 @@ module Dispatch
           if tc_delta["id"]
             tc[:id] = tc_delta["id"]
             tc[:name] = tc_delta.dig("function", "name") || ""
-            block.call(StreamDelta.new(
+            yield(StreamDelta.new(
               type: :tool_use_start,
               tool_call_id: tc[:id],
               tool_name: tc[:name]
@@ -612,7 +625,7 @@ module Dispatch
           next if arg_frag.empty?
 
           tc[:arguments] << arg_frag
-          block.call(StreamDelta.new(
+          yield(StreamDelta.new(
             type: :tool_use_delta,
             tool_call_id: tc[:id],
             argument_delta: arg_frag
