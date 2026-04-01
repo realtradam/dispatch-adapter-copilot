@@ -154,6 +154,32 @@ RSpec.describe Dispatch::Adapter do
       expect(info.supports_vision).to be(false)
       expect(info.supports_tool_use).to be(true)
       expect(info.supports_streaming).to be(true)
+      expect(info.premium_request_multiplier).to be_nil
+    end
+
+    it "accepts premium_request_multiplier" do
+      info = Dispatch::Adapter::ModelInfo.new(
+        id: "o3",
+        name: "o3",
+        max_context_tokens: 200_000,
+        supports_vision: false,
+        supports_tool_use: true,
+        supports_streaming: true,
+        premium_request_multiplier: 30.0
+      )
+      expect(info.premium_request_multiplier).to eq(30.0)
+    end
+
+    it "defaults premium_request_multiplier to nil" do
+      info = Dispatch::Adapter::ModelInfo.new(
+        id: "gpt-4.1-nano",
+        name: "GPT 4.1 Nano",
+        max_context_tokens: 1_047_576,
+        supports_vision: false,
+        supports_tool_use: true,
+        supports_streaming: true
+      )
+      expect(info.premium_request_multiplier).to be_nil
     end
   end
 

@@ -10,7 +10,8 @@ RSpec.describe Dispatch::Adapter::Copilot do
     described_class.new(
       model: "gpt-4.1",
       github_token: github_token,
-      max_tokens: 4096
+      max_tokens: 4096,
+      min_request_interval: 0
     )
   end
 
@@ -936,7 +937,7 @@ RSpec.describe Dispatch::Adapter::Copilot do
         )
 
       messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
-      response = adapter.chat(messages, stream: true) { |_| }
+      response = adapter.chat(messages, stream: true) { |_delta| nil }
 
       expect(response.usage.input_tokens).to eq(42)
       expect(response.usage.output_tokens).to eq(7)
@@ -1031,14 +1032,36 @@ RSpec.describe Dispatch::Adapter::Copilot do
   end
 
   describe "#list_models" do
-    it "returns an array of ModelInfo structs" do
-      stub_request(:get, "https://api.githubcopilot.com/v1/models")
+    it "returns an array of ModelInfo structs with billing data" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
         .to_return(
           status: 200,
           body: JSON.generate({
                                 "data" => [
-                                  { "id" => "gpt-4.1", "object" => "model" },
-                                  { "id" => "gpt-4o", "object" => "model" }
+                                  {
+                                    "id" => "gpt-4.1",
+                                    "name" => "GPT 4.1",
+                                    "vendor" => "copilot",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => {
+                                      "type" => "chat",
+                                      "supports" => { "streaming" => true, "tool_calls" => true, "vision" => false },
+                                      "limits" => { "max_context_window_tokens" => 1_047_576 }
+                                    },
+                                    "billing" => { "is_premium" => true, "multiplier" => 1.0 }
+                                  },
+                                  {
+                                    "id" => "gpt-4o",
+                                    "name" => "GPT 4o",
+                                    "vendor" => "copilot",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => {
+                                      "type" => "chat",
+                                      "supports" => { "streaming" => true, "tool_calls" => true, "vision" => true },
+                                      "limits" => { "max_context_window_tokens" => 128_000 }
+                                    },
+                                    "billing" => { "is_premium" => false, "multiplier" => 0.33 }
+                                  }
                                 ]
                               }),
           headers: { "Content-Type" => "application/json" }
@@ -1049,8 +1072,203 @@ RSpec.describe Dispatch::Adapter::Copilot do
       expect(models.size).to eq(2)
       expect(models.first).to be_a(Dispatch::Adapter::ModelInfo)
       expect(models.first.id).to eq("gpt-4.1")
+      expect(models.first.name).to eq("GPT 4.1")
       expect(models.first.max_context_tokens).to eq(1_047_576)
+      expect(models.first.supports_tool_use).to be(true)
+      expect(models.first.supports_streaming).to be(true)
+      expect(models.first.supports_vision).to be(false)
+      expect(models.first.premium_request_multiplier).to eq(1.0)
+
       expect(models.last.id).to eq("gpt-4o")
+      expect(models.last.premium_request_multiplier).to eq(0.33)
+      expect(models.last.supports_vision).to be(true)
+    end
+
+    it "sends X-Github-Api-Version header" do
+      stub = stub_request(:get, "https://api.githubcopilot.com/models")
+             .with(headers: { "X-Github-Api-Version" => "2025-10-01" })
+             .to_return(
+               status: 200,
+               body: JSON.generate({ "data" => [] }),
+               headers: { "Content-Type" => "application/json" }
+             )
+
+      adapter.list_models
+
+      expect(stub).to have_been_requested
+    end
+
+    it "filters out models with model_picker_enabled false" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+                                "data" => [
+                                  {
+                                    "id" => "visible-model",
+                                    "name" => "Visible Model",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => { "type" => "chat", "supports" => {} },
+                                    "billing" => { "multiplier" => 1.0 }
+                                  },
+                                  {
+                                    "id" => "hidden-model",
+                                    "name" => "Hidden Model",
+                                    "model_picker_enabled" => false,
+                                    "capabilities" => { "type" => "chat", "supports" => {} },
+                                    "billing" => { "multiplier" => 1.0 }
+                                  }
+                                ]
+                              }),
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      models = adapter.list_models
+
+      expect(models.size).to eq(1)
+      expect(models.first.id).to eq("visible-model")
+    end
+
+    it "filters out non-chat models" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+                                "data" => [
+                                  {
+                                    "id" => "chat-model",
+                                    "name" => "Chat Model",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => { "type" => "chat", "supports" => {} },
+                                    "billing" => { "multiplier" => 1.0 }
+                                  },
+                                  {
+                                    "id" => "completion-model",
+                                    "name" => "Completion Model",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => { "type" => "completion", "supports" => {} },
+                                    "billing" => { "multiplier" => 0.5 }
+                                  }
+                                ]
+                              }),
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      models = adapter.list_models
+
+      expect(models.size).to eq(1)
+      expect(models.first.id).to eq("chat-model")
+    end
+
+    it "includes models with array type containing chat" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+                                "data" => [
+                                  {
+                                    "id" => "multi-type-model",
+                                    "name" => "Multi Type",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => { "type" => %w[chat completion], "supports" => {} },
+                                    "billing" => { "multiplier" => 3.0 }
+                                  }
+                                ]
+                              }),
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      models = adapter.list_models
+
+      expect(models.size).to eq(1)
+      expect(models.first.id).to eq("multi-type-model")
+      expect(models.first.premium_request_multiplier).to eq(3.0)
+    end
+
+    it "falls back to MODEL_CONTEXT_WINDOWS when limits not in response" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+                                "data" => [
+                                  {
+                                    "id" => "gpt-4o",
+                                    "name" => "GPT 4o",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => { "type" => "chat", "supports" => {} },
+                                    "billing" => { "multiplier" => 0.33 }
+                                  }
+                                ]
+                              }),
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      models = adapter.list_models
+
+      expect(models.first.max_context_tokens).to eq(128_000)
+    end
+
+    it "returns nil premium_request_multiplier when billing is absent" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+                                "data" => [
+                                  {
+                                    "id" => "no-billing-model",
+                                    "name" => "No Billing",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => { "type" => "chat", "supports" => {} }
+                                  }
+                                ]
+                              }),
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      models = adapter.list_models
+
+      expect(models.first.premium_request_multiplier).to be_nil
+    end
+
+    it "returns premium models with high multipliers" do
+      stub_request(:get, "https://api.githubcopilot.com/models")
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+                                "data" => [
+                                  {
+                                    "id" => "o3",
+                                    "name" => "o3",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => {
+                                      "type" => "chat",
+                                      "supports" => { "streaming" => true, "tool_calls" => true }
+                                    },
+                                    "billing" => { "is_premium" => true, "multiplier" => 30.0 }
+                                  },
+                                  {
+                                    "id" => "gpt-4.1-nano",
+                                    "name" => "GPT 4.1 Nano",
+                                    "model_picker_enabled" => true,
+                                    "capabilities" => {
+                                      "type" => "chat",
+                                      "supports" => { "streaming" => true, "tool_calls" => true }
+                                    },
+                                    "billing" => { "is_premium" => false, "multiplier" => 0.33 }
+                                  }
+                                ]
+                              }),
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      models = adapter.list_models
+
+      expect(models.size).to eq(2)
+      o3 = models.find { |m| m.id == "o3" }
+      nano = models.find { |m| m.id == "gpt-4.1-nano" }
+
+      expect(o3.premium_request_multiplier).to eq(30.0)
+      expect(nano.premium_request_multiplier).to eq(0.33)
     end
   end
 

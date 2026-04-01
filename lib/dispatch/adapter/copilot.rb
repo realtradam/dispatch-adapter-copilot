@@ -116,23 +116,20 @@ module Dispatch
       def list_models
         ensure_authenticated!
         @rate_limiter.wait!
-        uri = URI("#{API_BASE}/v1/models")
+        uri = URI("#{API_BASE}/models")
         request = Net::HTTP::Get.new(uri)
         apply_headers!(request)
+        request["X-Github-Api-Version"] = "2025-10-01"
 
         response = execute_request(uri, request)
         data = parse_response!(response)
         models = data["data"] || []
 
-        models.map do |m|
-          ModelInfo.new(
-            id: m["id"],
-            name: m["id"],
-            max_context_tokens: MODEL_CONTEXT_WINDOWS.fetch(m["id"], 0),
-            supports_vision: false,
-            supports_tool_use: true,
-            supports_streaming: true
-          )
+        models.filter_map do |m|
+          next unless m["model_picker_enabled"]
+          next unless chat_model?(m)
+
+          build_model_info(m)
         end
       end
 
@@ -145,6 +142,40 @@ module Dispatch
 
         raise ArgumentError,
               "Invalid thinking level: #{level.inspect}. Must be one of: #{VALID_THINKING_LEVELS.join(", ")}, or nil"
+      end
+
+      def chat_model?(model_data)
+        capabilities = model_data["capabilities"]
+        return true unless capabilities
+
+        model_type = capabilities["type"]
+        return true if model_type.nil?
+
+        if model_type.is_a?(Array)
+          model_type.include?("chat")
+        else
+          model_type == "chat"
+        end
+      end
+
+      def build_model_info(model_data)
+        capabilities = model_data["capabilities"] || {}
+        supports = capabilities["supports"] || {}
+        limits = capabilities["limits"] || {}
+        billing = model_data["billing"] || {}
+
+        context_tokens = limits["max_context_window_tokens"] ||
+                         MODEL_CONTEXT_WINDOWS.fetch(model_data["id"], 0)
+
+        ModelInfo.new(
+          id: model_data["id"],
+          name: model_data["name"] || model_data["id"],
+          max_context_tokens: context_tokens.to_i,
+          supports_vision: !!supports["vision"],
+          supports_tool_use: !!supports["tool_calls"],
+          supports_streaming: !!supports["streaming"],
+          premium_request_multiplier: billing["multiplier"]&.to_f
+        )
       end
 
       def default_token_path
@@ -571,7 +602,7 @@ module Dispatch
           next if line.empty?
           next unless line.start_with?("data: ")
 
-          data_str = line.sub(/\Adata: /, "")
+          data_str = line.delete_prefix("data: ")
           next if data_str == "[DONE]"
 
           data = JSON.parse(data_str)

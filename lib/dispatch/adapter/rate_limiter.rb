@@ -20,6 +20,7 @@ module Dispatch
 
         loop do
           wait_time = 0.0
+          done = false
 
           File.open(rate_limit_file, File::RDWR | File::CREAT) do |file|
             file.flock(File::LOCK_EX)
@@ -30,9 +31,11 @@ module Dispatch
             if wait_time <= 0
               record_request(state, now)
               write_state(file, state)
-              return
+              done = true
             end
           end
+
+          return if done
 
           sleep(wait_time)
         end
@@ -99,7 +102,7 @@ module Dispatch
 
         elapsed = now - last
         remaining = interval - elapsed
-        remaining > 0 ? remaining : 0.0
+        remaining.positive? ? remaining : 0.0
       end
 
       def compute_window_wait(state, now)
@@ -115,7 +118,7 @@ module Dispatch
 
         oldest_in_window = log.min
         wait = oldest_in_window + period - now
-        wait > 0 ? wait : 0.0
+        wait.positive? ? wait : 0.0
       end
 
       def record_request(state, now)

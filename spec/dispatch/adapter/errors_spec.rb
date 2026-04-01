@@ -20,7 +20,7 @@ RSpec.describe Dispatch::Adapter::Error do
 
   it "can be rescued as StandardError" do
     expect do
-      raise described_class.new("test")
+      raise described_class, "test"
     end.to raise_error(StandardError)
   end
 end
@@ -45,7 +45,7 @@ RSpec.describe Dispatch::Adapter::RateLimitError do
 
   it "is rescuable as Dispatch::Adapter::Error" do
     expect do
-      raise described_class.new("rate limited")
+      raise described_class, "rate limited"
     end.to raise_error(Dispatch::Adapter::Error)
   end
 end

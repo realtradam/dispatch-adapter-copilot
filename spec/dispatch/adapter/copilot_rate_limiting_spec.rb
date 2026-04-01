@@ -199,7 +199,7 @@ RSpec.describe Dispatch::Adapter::Copilot, "rate limiting" do
         github_token: github_token,
         token_path: token_path
       )
-      adapter.chat(messages, stream: true) { |_| }
+      adapter.chat(messages, stream: true) { |_| nil }
 
       expect(rate_limiter).to have_received(:wait!).once
     end
@@ -207,10 +207,17 @@ RSpec.describe Dispatch::Adapter::Copilot, "rate limiting" do
 
   describe "#list_models with rate limiting" do
     it "calls wait! before list_models request" do
-      stub_request(:get, "https://api.githubcopilot.com/v1/models")
+      stub_request(:get, "https://api.githubcopilot.com/models")
         .to_return(
           status: 200,
-          body: JSON.generate({ "data" => [{ "id" => "gpt-4.1", "object" => "model" }] }),
+          body: JSON.generate({
+                                "data" => [{
+                                  "id" => "gpt-4.1",
+                                  "name" => "GPT 4.1",
+                                  "model_picker_enabled" => true,
+                                  "capabilities" => { "type" => "chat", "supports" => {} }
+                                }]
+                              }),
           headers: { "Content-Type" => "application/json" }
         )
 

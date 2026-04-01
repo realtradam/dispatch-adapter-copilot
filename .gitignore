@@ -12,3 +12,5 @@
 
 # Built gems
 *.gem
+
+reference/

@@ -11,7 +11,7 @@ module Dispatch
         raise NotImplementedError, "#{self.class}#model_name must be implemented"
       end
 
-      def count_tokens(_messages, system: nil, tools: [])
+      def count_tokens(_messages, system: nil, tools: []) # rubocop:disable Lint/UnusedMethodArgument
         -1
       end
 
