@@ -6,12 +6,7 @@ require "json"
 require "securerandom"
 require "fileutils"
 
-require_relative "errors"
-require_relative "message"
-require_relative "response"
-require_relative "tool_definition"
-require_relative "model_info"
-require_relative "base"
+require "dispatch/adapter/interface"
 require_relative "rate_limiter"
 
 require_relative "version"
@@ -56,7 +51,7 @@ module Dispatch
 
       VALID_THINKING_LEVELS = %w[low medium high].freeze
 
-      def initialize(model: "gpt-4.1", github_token: nil, token_path: nil, max_tokens: 8192, thinking: nil,
+      def initialize(model: "gpt-4.1", github_token: nil, token_path: nil, max_tokens: 8192, thinking: "high",
                      min_request_interval: 3.0, rate_limit: nil)
         super()
         @model = model
@@ -88,9 +83,13 @@ module Dispatch
         body = {
           model: @model,
           messages: wire_messages,
-          max_tokens: effective_max_tokens,
           stream: stream
         }
+        if uses_max_completion_tokens?
+          body[:max_completion_tokens] = effective_max_tokens
+        else
+          body[:max_tokens] = effective_max_tokens
+        end
         body[:tools] = wire_tools unless wire_tools.empty?
         body[:reasoning_effort] = effective_thinking if effective_thinking
 
@@ -176,6 +175,10 @@ module Dispatch
           supports_streaming: !!supports["streaming"],
           premium_request_multiplier: billing["multiplier"]&.to_f
         )
+      end
+
+      def uses_max_completion_tokens?
+        @model.match?(/o[1-9]|gpt-5|gemini/)
       end
 
       def default_token_path
@@ -457,13 +460,13 @@ module Dispatch
       def merge_consecutive_roles(messages)
         return messages if messages.empty?
 
-        merged = [messages.first.dup]
+        merged = [ messages.first.dup ]
 
         messages[1..].each do |msg|
           prev = merged.last
 
           if prev[:role] == msg[:role] && prev[:role] != "tool" && !msg.key?(:tool_calls) && !prev.key?(:tool_calls)
-            prev[:content] = [prev[:content], msg[:content]].compact.join("\n\n")
+            prev[:content] = [ prev[:content], msg[:content] ].compact.join("\n\n")
           else
             merged << msg.dup
           end

@@ -5,6 +5,8 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in dispatch-adapter-copilot.gemspec
 gemspec
 
+gem "dispatch-adapter-interface", path: "../dispatch-adapter-interface"
+
 gem "irb"
 gem "rake", "~> 13.0"
 

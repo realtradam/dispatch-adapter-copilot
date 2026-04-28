@@ -90,7 +90,7 @@ module Dispatch
       def compute_wait(state, now)
         cooldown_wait = compute_cooldown_wait(state, now)
         window_wait = compute_window_wait(state, now)
-        [cooldown_wait, window_wait].max
+        [ cooldown_wait, window_wait ].max
       end
 
       def compute_cooldown_wait(state, now)

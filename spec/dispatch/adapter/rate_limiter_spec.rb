@@ -240,7 +240,7 @@ RSpec.describe Dispatch::Adapter::RateLimiter do
         now = Time.now.to_f
         state = {
           "last_request_at" => now,
-          "request_log" => [now - 2.0, now - 1.0, now]
+          "request_log" => [ now - 2.0, now - 1.0, now ]
         }
         File.write(rate_limit_path, JSON.generate(state))
 
@@ -252,7 +252,7 @@ RSpec.describe Dispatch::Adapter::RateLimiter do
         now = Time.now.to_f
         state = {
           "last_request_at" => now - 5.0,
-          "request_log" => [now - 15.0, now - 12.0, now - 5.0]
+          "request_log" => [ now - 15.0, now - 12.0, now - 5.0 ]
         }
         File.write(rate_limit_path, JSON.generate(state))
 
@@ -264,7 +264,7 @@ RSpec.describe Dispatch::Adapter::RateLimiter do
         now = Time.now.to_f
         state = {
           "last_request_at" => now - 5.0,
-          "request_log" => [now - 20.0, now - 15.0, now - 5.0]
+          "request_log" => [ now - 20.0, now - 15.0, now - 5.0 ]
         }
         File.write(rate_limit_path, JSON.generate(state))
 
@@ -299,7 +299,7 @@ RSpec.describe Dispatch::Adapter::RateLimiter do
         now = Time.now.to_f
         state = {
           "last_request_at" => now - 2.0, # cooldown elapsed
-          "request_log" => [now - 3.0, now - 2.5, now - 2.0] # window full
+          "request_log" => [ now - 3.0, now - 2.5, now - 2.0 ] # window full
         }
         File.write(rate_limit_path, JSON.generate(state))
 
@@ -380,7 +380,7 @@ RSpec.describe Dispatch::Adapter::RateLimiter do
       it "reads state written by another process" do
         # Simulate another process having made a request just now
         now = Time.now.to_f
-        state = { "last_request_at" => now, "request_log" => [now] }
+        state = { "last_request_at" => now, "request_log" => [ now ] }
         FileUtils.mkdir_p(File.dirname(rate_limit_path))
         File.write(rate_limit_path, JSON.generate(state))
 

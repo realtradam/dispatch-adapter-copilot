@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+GEM_NAME="dispatch-adapter-copilot"
+
+echo "--- Building $GEM_NAME ---"
+gem build "$GEM_NAME.gemspec"
+
+GEM_FILE=$(ls -t "$GEM_NAME"-*.gem 2>/dev/null | head -1)
+
+if [ -z "$GEM_FILE" ]; then
+  echo "ERROR: No .gem file found after build."
+  exit 1
+fi
+
+echo ""
+echo "--- Installing $GEM_FILE ---"
+gem install "$GEM_FILE" --local
+
+echo ""
+echo "Done. $GEM_NAME installed."

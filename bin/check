@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+RESULTS_FILE="test_results.txt"
+
+{
+  echo "============================================"
+  echo "dispatch-adapter-copilot — $(date)"
+  echo "============================================"
+  echo ""
+
+  echo "--- bundle install ---"
+  bundle install 2>&1
+  echo ""
+
+  echo "--- rubocop --autocorrect-all ---"
+  bundle exec rubocop --autocorrect-all 2>&1 || true
+  echo ""
+
+  echo "--- rspec ---"
+  bundle exec rspec 2>&1 || true
+  echo ""
+
+  echo "============================================"
+  echo "Done."
+  echo "============================================"
+} | tee "$RESULTS_FILE"
+
+echo ""
+echo "Results written to $RESULTS_FILE"
