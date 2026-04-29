@@ -51,14 +51,22 @@ module Dispatch
 
       VALID_THINKING_LEVELS = %w[low medium high].freeze
 
+      # Default Editor-Version header value. Mimics what codecompanion.nvim
+      # sends so that requests are indistinguishable on the wire from the
+      # well-known Neovim Copilot adapter (which is widely used and trusted).
+      # Override via the `editor_version:` constructor option if you need a
+      # different value (e.g. your actual running Neovim version).
+      DEFAULT_EDITOR_VERSION = "Neovim/0.10.4"
+
       def initialize(model: "gpt-4.1", github_token: nil, token_path: nil, max_tokens: 8192, thinking: "high",
-                     min_request_interval: 3.0, rate_limit: nil)
+                     min_request_interval: 3.0, rate_limit: nil, editor_version: DEFAULT_EDITOR_VERSION)
         super()
         @model = model
         @github_token = github_token
         @token_path = token_path || default_token_path
         @default_max_tokens = max_tokens
         @default_thinking = thinking
+        @editor_version = editor_version
         @copilot_token = nil
         @copilot_token_expires_at = 0
         @mutex = Mutex.new
@@ -295,13 +303,51 @@ module Dispatch
 
       # --- HTTP helpers ---
 
-      def apply_headers!(request)
+      # Apply the request headers used for Copilot chat completions.
+      #
+      # Header set is intentionally identical to what codecompanion.nvim's
+      # Copilot adapter sends (see lua/codecompanion/adapters/http/copilot/init.lua):
+      #
+      #   - Authorization: Bearer <copilot-token>
+      #   - Content-Type: application/json
+      #   - Copilot-Integration-Id: vscode-chat
+      #   - Editor-Version: Neovim/x.y.z (configurable)
+      #   - X-Initiator: user|agent (only added by callers via apply_headers!)
+      #
+      # We deliberately DO NOT send `Openai-Intent` because codecompanion
+      # does not, and matching that wire profile is the goal.
+      def apply_headers!(request, initiator: "user")
         request["Authorization"] = "Bearer #{@copilot_token}"
         request["Content-Type"] = "application/json"
         request["Accept"] = "application/json"
         request["Copilot-Integration-Id"] = "vscode-chat"
-        request["Editor-Version"] = "dispatch/#{VERSION}"
-        request["Openai-Intent"] = "conversation-panel"
+        request["Editor-Version"] = @editor_version
+        request["X-Initiator"] = initiator
+      end
+
+      # Decides the value of the `X-Initiator` header that GitHub Copilot uses
+      # to classify a request as a billable premium request ("user") or a
+      # non-billable agent continuation ("agent").
+      #
+      # Strategy: "savings" mode (matches ericc-ch/copilot-api default and is
+      # more aggressive than codecompanion.nvim / VS Code).
+      #
+      #   * If the wire payload contains ANY assistant or tool message, it means
+      #     the model has already produced at least one turn — therefore this
+      #     send is part of an ongoing agent loop (typically a tool-result
+      #     follow-up) and is NOT a fresh user-initiated turn. → "agent".
+      #   * Otherwise this is the very first send for a conversation (only
+      #     system + user messages present). → "user".
+      #
+      # Only the initial user prompt of an automation should be billed as a
+      # premium request; every subsequent tool-loop continuation is free.
+      #
+      # Rationale & references:
+      #   - codecompanion.nvim PR #1738 / Discussion #1717
+      #   - ericc-ch/copilot-api PR #85 ("savings" vs "per-user-prompt" modes)
+      #   - https://docs.github.com/en/copilot/concepts/billing/copilot-requests
+      def x_initiator_for(wire_messages)
+        wire_messages.any? { |m| %w[assistant tool].include?(m[:role].to_s) } ? "agent" : "user"
       end
 
       def execute_request(uri, request)
@@ -460,13 +506,13 @@ module Dispatch
       def merge_consecutive_roles(messages)
         return messages if messages.empty?
 
-        merged = [ messages.first.dup ]
+        merged = [messages.first.dup]
 
         messages[1..].each do |msg|
           prev = merged.last
 
           if prev[:role] == msg[:role] && prev[:role] != "tool" && !msg.key?(:tool_calls) && !prev.key?(:tool_calls)
-            prev[:content] = [ prev[:content], msg[:content] ].compact.join("\n\n")
+            prev[:content] = [prev[:content], msg[:content]].compact.join("\n\n")
           else
             merged << msg.dup
           end
@@ -504,8 +550,8 @@ module Dispatch
         @rate_limiter.wait!
         uri = URI("#{API_BASE}/chat/completions")
         request = Net::HTTP::Post.new(uri)
-        apply_headers!(request)
-        request.body = JSON.generate(body)
+        apply_headers!(request, initiator: x_initiator_for(body[:messages] || []))
+        request.body = JSON.generate(deep_utf8(body))
 
         response = execute_request(uri, request)
         data = parse_response!(response)
@@ -557,6 +603,35 @@ module Dispatch
         )
       end
 
+      # Recursively coerces every String inside a wire-body to valid UTF-8.
+      #
+      # Tool results (grep output, file reads, shell stdout) frequently arrive
+      # tagged as US-ASCII or BINARY/ASCII-8BIT even though the bytes are
+      # legitimate UTF-8 (e.g. an em-dash \xE2\x80\x94 inside a source
+      # comment). `JSON.generate` then raises
+      # `Encoding::InvalidByteSequenceError: "\xE2" on US-ASCII` because it
+      # tries to re-encode the mistagged string.
+      #
+      # We force_encoding to UTF-8 (no byte rewrite) and then `scrub` to
+      # replace any genuinely invalid sequences with the Unicode replacement
+      # character so JSON.generate can never fail on user-provided text.
+      def deep_utf8(obj)
+        case obj
+        when String
+          s = obj.dup
+          s.force_encoding(Encoding::UTF_8)
+          s.valid_encoding? ? s : s.scrub("\uFFFD")
+        when Array
+          obj.map { |v| deep_utf8(v) }
+        when Hash
+          obj.each_with_object({}) { |(k, v), h| h[k] = deep_utf8(v) }
+        when Symbol
+          obj
+        else
+          obj
+        end
+      end
+
       def parse_tool_arguments(args_string)
         return {} if args_string.nil? || args_string.empty?
 
@@ -571,8 +646,8 @@ module Dispatch
         @rate_limiter.wait!
         uri = URI("#{API_BASE}/chat/completions")
         request = Net::HTTP::Post.new(uri)
-        apply_headers!(request)
-        request.body = JSON.generate(body)
+        apply_headers!(request, initiator: x_initiator_for(body[:messages] || []))
+        request.body = JSON.generate(deep_utf8(body))
 
         collected = new_stream_collector
 

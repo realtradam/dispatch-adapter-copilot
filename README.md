@@ -204,6 +204,64 @@ All communication uses these structs (under `Dispatch::Adapter`):
 | `StreamDelta` | Incremental streaming chunk |
 | `ModelInfo` | Model metadata |
 
+## Premium Requests / Billing Behavior
+
+GitHub Copilot bills your monthly *premium request* quota only for chat
+completions sent with the HTTP header `X-Initiator: user`. Continuations sent
+with `X-Initiator: agent` (e.g. follow-up calls inside an agent tool loop) are
+**not** counted against your premium quota.
+
+This adapter automatically chooses the correct value for `X-Initiator` on
+every request using a "savings" strategy:
+
+* The **first** send of a conversation — i.e. only `system` and `user`
+  messages are present — is sent as `X-Initiator: user` and **is** billed as a
+  premium request.
+* **Every subsequent send** — anything that contains a prior `assistant` or
+  `tool` message in the wire payload — is sent as `X-Initiator: agent` and is
+  **not** billed.
+
+In practice this means: in a typical agent-loop usage of this gem (initial
+user prompt → model returns tool calls → your code executes them and sends
+results back → repeat until the model gives a final answer), exactly **one**
+premium request is consumed per top-level user prompt, regardless of how many
+tool round-trips occur in between.
+
+This behavior is more aggressive (i.e. cheaper) than the official VS Code
+Copilot extension and matches the default mode of
+[`ericc-ch/copilot-api`](https://github.com/ericc-ch/copilot-api). It assumes
+the gem is being used for automation, where every send after the first is
+part of the same agent task.
+
+### Wire-level parity with codecompanion.nvim
+
+The HTTP request headers this adapter sends to `api.githubcopilot.com` are
+identical to those sent by
+[codecompanion.nvim](https://github.com/olimorris/codecompanion.nvim)'s
+Copilot adapter:
+
+| Header | Value |
+|---|---|
+| `Authorization` | `Bearer <copilot-token>` |
+| `Content-Type` | `application/json` |
+| `Copilot-Integration-Id` | `vscode-chat` |
+| `Editor-Version` | `Neovim/0.10.4` (default — override via `editor_version:`) |
+| `X-Initiator` | `user` or `agent` (see above) |
+
+Notably, `Openai-Intent` is **not** sent (codecompanion does not send it).
+
+If you want the request to claim a specific Neovim version (e.g. the one
+you actually run), pass it to the constructor:
+
+```ruby
+adapter = Dispatch::Adapter::Copilot.new(editor_version: "Neovim/0.12.1")
+```
+
+References:
+- [GitHub: What are premium requests?](https://docs.github.com/en/copilot/concepts/billing/copilot-requests#what-are-premium-requests)
+- [codecompanion.nvim Discussion #1717 / PR #1738](https://github.com/olimorris/codecompanion.nvim/discussions/1717)
+- [ericc-ch/copilot-api PR #85](https://github.com/ericc-ch/copilot-api/pull/85)
+
 ## Error Handling
 
 All errors inherit from `Dispatch::Adapter::Error` (which inherits from `StandardError`):

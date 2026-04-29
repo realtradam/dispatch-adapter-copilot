@@ -12,12 +12,12 @@ RSpec.describe Dispatch::Adapter::Copilot, "rate limiting" do
 
   let(:chat_response_body) do
     JSON.generate({
-                    "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                    "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                     "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                   })
   end
 
-  let(:messages) { [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ] }
+  let(:messages) { [Dispatch::Adapter::Message.new(role: "user", content: "Hi")] }
 
   before do
     stub_request(:get, "https://api.github.com/copilot_internal/v2/token")
@@ -181,8 +181,8 @@ RSpec.describe Dispatch::Adapter::Copilot, "rate limiting" do
   describe "#chat streaming with rate limiting" do
     it "calls wait! before a streaming request" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [ { "delta" => { "content" => "hi" }, "index" => 0 } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ { "delta" => {}, "index" => 0, "finish_reason" => "stop" } ],
+        "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => "hi" }, "index" => 0 }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }],
                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 } })}\n\n",
         "data: [DONE]\n\n"
       ].join
@@ -211,12 +211,12 @@ RSpec.describe Dispatch::Adapter::Copilot, "rate limiting" do
         .to_return(
           status: 200,
           body: JSON.generate({
-                                "data" => [ {
+                                "data" => [{
                                   "id" => "gpt-4.1",
                                   "name" => "GPT 4.1",
                                   "model_picker_enabled" => true,
                                   "capabilities" => { "type" => "chat", "supports" => {} }
-                                } ]
+                                }]
                               }),
           headers: { "Content-Type" => "application/json" }
         )

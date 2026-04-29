@@ -6,6 +6,32 @@ RSpec.describe Dispatch::Adapter::Copilot do
   let(:copilot_token) { "cop_test_token_abc" }
   let(:github_token) { "gho_test_github_token" }
 
+  # ---------------------------------------------------------------------------
+  # SAFETY: this MUST be the first test in the file. If WebMock is not
+  # globally blocking real network access, every other test in this gem could
+  # potentially hit the real GitHub Copilot API and consume premium-request
+  # quota / leak credentials. If this test fails, STOP and fix spec_helper
+  # before running any other spec.
+  # ---------------------------------------------------------------------------
+  describe "!! network safety !!" do
+    it "globally blocks real outbound HTTP via WebMock" do
+      expect(WebMock.net_connect_allowed?).to be(false)
+    end
+
+    it "raises when an unstubbed request is attempted" do
+      expect do
+        Net::HTTP.get(URI("https://api.githubcopilot.com/never-should-fire"))
+      end.to raise_error(WebMock::NetConnectNotAllowedError)
+    end
+
+    it "forbids localhost as well (no accidental dev-server contact)" do
+      # The spec_helper passes allow_localhost: false. Verify it.
+      expect do
+        Net::HTTP.get(URI("http://127.0.0.1:1/should-not-fire"))
+      end.to raise_error(WebMock::NetConnectNotAllowedError)
+    end
+  end
+
   let(:adapter) do
     described_class.new(
       model: "gpt-4.1",
@@ -37,7 +63,7 @@ RSpec.describe Dispatch::Adapter::Copilot do
 
   describe "VERSION" do
     it "is accessible" do
-expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
+      expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.4.0")
     end
   end
 
@@ -73,11 +99,11 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
             body: JSON.generate({
                                   "id" => "chatcmpl-123",
                                   "model" => "gpt-4.1",
-                                  "choices" => [ {
+                                  "choices" => [{
                                     "index" => 0,
                                     "message" => { "role" => "assistant", "content" => "Hello there!" },
                                     "finish_reason" => "stop"
-                                  } ],
+                                  }],
                                   "usage" => { "prompt_tokens" => 10, "completion_tokens" => 5 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -85,7 +111,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       end
 
       it "returns a Response with content" do
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         response = adapter.chat(messages)
 
         expect(response).to be_a(Dispatch::Adapter::Response)
@@ -106,22 +132,22 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
             body: JSON.generate({
                                   "id" => "chatcmpl-456",
                                   "model" => "gpt-4.1",
-                                  "choices" => [ {
+                                  "choices" => [{
                                     "index" => 0,
                                     "message" => {
                                       "role" => "assistant",
                                       "content" => nil,
-                                      "tool_calls" => [ {
+                                      "tool_calls" => [{
                                         "id" => "call_abc",
                                         "type" => "function",
                                         "function" => {
                                           "name" => "get_weather",
                                           "arguments" => '{"city":"New York"}'
                                         }
-                                      } ]
+                                      }]
                                     },
                                     "finish_reason" => "tool_calls"
-                                  } ],
+                                  }],
                                   "usage" => { "prompt_tokens" => 15, "completion_tokens" => 10 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -129,7 +155,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       end
 
       it "returns a Response with tool_calls as ToolUseBlock array" do
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "What's the weather?") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "What's the weather?")]
         response = adapter.chat(messages)
 
         expect(response.content).to be_nil
@@ -150,7 +176,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ {
+                                  "choices" => [{
                                     "index" => 0,
                                     "message" => {
                                       "role" => "assistant",
@@ -169,7 +195,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
                                       ]
                                     },
                                     "finish_reason" => "tool_calls"
-                                  } ],
+                                  }],
                                   "usage" => { "prompt_tokens" => 20, "completion_tokens" => 15 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -177,7 +203,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       end
 
       it "returns multiple ToolUseBlocks" do
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "weather and time?") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "weather and time?")]
         response = adapter.chat(messages)
 
         expect(response.tool_calls.size).to eq(2)
@@ -197,22 +223,22 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
             body: JSON.generate({
                                   "id" => "chatcmpl-789",
                                   "model" => "gpt-4.1",
-                                  "choices" => [ {
+                                  "choices" => [{
                                     "index" => 0,
                                     "message" => {
                                       "role" => "assistant",
                                       "content" => "Let me check that for you.",
-                                      "tool_calls" => [ {
+                                      "tool_calls" => [{
                                         "id" => "call_def",
                                         "type" => "function",
                                         "function" => {
                                           "name" => "search",
                                           "arguments" => '{"query":"Ruby gems"}'
                                         }
-                                      } ]
+                                      }]
                                     },
                                     "finish_reason" => "tool_calls"
-                                  } ],
+                                  }],
                                   "usage" => { "prompt_tokens" => 20, "completion_tokens" => 15 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -220,7 +246,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       end
 
       it "returns both content and tool_calls" do
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Search for Ruby gems") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Search for Ruby gems")]
         response = adapter.chat(messages)
 
         expect(response.content).to eq("Let me check that for you.")
@@ -239,13 +265,13 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "OK" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "OK" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         adapter.chat(messages, system: "You are helpful.")
 
         expect(stub).to have_been_requested
@@ -262,13 +288,13 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "short" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "short" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         adapter.chat(messages, max_tokens: 100)
 
         expect(stub).to have_been_requested
@@ -283,13 +309,13 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         adapter.chat(messages)
 
         expect(stub).to have_been_requested
@@ -307,26 +333,26 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
                .with do |req|
                  body = JSON.parse(req.body)
-                 body["tools"] == [ {
+                 body["tools"] == [{
                    "type" => "function",
                    "function" => {
                      "name" => "get_weather",
                      "description" => "Get weather for a city",
                      "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
                    }
-                 } ]
+                 }]
                end
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "weather?") ]
-        adapter.chat(messages, tools: [ tool ])
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "weather?")]
+        adapter.chat(messages, tools: [tool])
 
         expect(stub).to have_been_requested
       end
@@ -341,26 +367,26 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
                .with do |req|
                  body = JSON.parse(req.body)
-                 body["tools"] == [ {
+                 body["tools"] == [{
                    "type" => "function",
                    "function" => {
                      "name" => "get_weather",
                      "description" => "Get weather for a city",
                      "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
                    }
-                 } ]
+                 }]
                end
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "weather?") ]
-        adapter.chat(messages, tools: [ tool_hash ])
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "weather?")]
+        adapter.chat(messages, tools: [tool_hash])
 
         expect(stub).to have_been_requested
       end
@@ -375,26 +401,26 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
                .with do |req|
                  body = JSON.parse(req.body)
-                 body["tools"] == [ {
+                 body["tools"] == [{
                    "type" => "function",
                    "function" => {
                      "name" => "get_weather",
                      "description" => "Get weather for a city",
                      "parameters" => { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
                    }
-                 } ]
+                 }]
                end
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "weather?") ]
-        adapter.chat(messages, tools: [ tool_hash ])
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "weather?")]
+        adapter.chat(messages, tools: [tool_hash])
 
         expect(stub).to have_been_requested
       end
@@ -421,14 +447,14 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "both?") ]
-        adapter.chat(messages, tools: [ tool_struct, tool_hash ])
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "both?")]
+        adapter.chat(messages, tools: [tool_struct, tool_hash])
 
         expect(stub).to have_been_requested
       end
@@ -442,13 +468,13 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         adapter.chat(messages)
 
         expect(stub).to have_been_requested
@@ -466,8 +492,8 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
         messages = [
           Dispatch::Adapter::Message.new(role: "user", content: "What's the weather?"),
-          Dispatch::Adapter::Message.new(role: "assistant", content: [ tool_use ]),
-          Dispatch::Adapter::Message.new(role: "user", content: [ tool_result ])
+          Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+          Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
@@ -488,8 +514,8 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "It's 72F and sunny in NYC!" },
-                                                  "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "It's 72F and sunny in NYC!" },
+                                                  "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 20, "completion_tokens" => 10 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -503,7 +529,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
     context "with ImageBlock" do
       it "raises NotImplementedError" do
         image = Dispatch::Adapter::ImageBlock.new(source: "base64data", media_type: "image/png")
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: [ image ]) ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: [image])]
 
         expect { adapter.chat(messages) }.to raise_error(NotImplementedError, /ImageBlock/)
       end
@@ -515,7 +541,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           Dispatch::Adapter::TextBlock.new(text: "First paragraph."),
           Dispatch::Adapter::TextBlock.new(text: "Second paragraph.")
         ]
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: text_blocks) ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: text_blocks)]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
                .with do |req|
@@ -526,7 +552,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -552,8 +578,8 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
         messages = [
           Dispatch::Adapter::Message.new(role: "user", content: "search"),
-          Dispatch::Adapter::Message.new(role: "assistant", content: [ tool_use ]),
-          Dispatch::Adapter::Message.new(role: "user", content: [ tool_result ])
+          Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+          Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
@@ -566,7 +592,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 10, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -588,8 +614,8 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
         messages = [
           Dispatch::Adapter::Message.new(role: "user", content: "do it"),
-          Dispatch::Adapter::Message.new(role: "assistant", content: [ tool_use ]),
-          Dispatch::Adapter::Message.new(role: "user", content: [ tool_result ])
+          Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+          Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
@@ -602,8 +628,8 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "I see the error" },
-                                                  "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "I see the error" },
+                                                  "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 10, "completion_tokens" => 3 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -620,16 +646,16 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ {
+                                  "choices" => [{
                                     "message" => { "content" => "truncated output..." },
                                     "finish_reason" => "length"
-                                  } ],
+                                  }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 100 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Write a long essay") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Write a long essay")]
         response = adapter.chat(messages)
 
         expect(response.stop_reason).to eq(:max_tokens)
@@ -646,7 +672,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
         messages = [
           Dispatch::Adapter::Message.new(role: "user", content: "lookup 42"),
-          Dispatch::Adapter::Message.new(role: "assistant", content: [ text, tool_use ])
+          Dispatch::Adapter::Message.new(role: "assistant", content: [text, tool_use])
         ]
 
         stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
@@ -662,7 +688,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 10, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -689,7 +715,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
@@ -710,14 +736,14 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "thought deeply" },
-                                                  "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "thought deeply" },
+                                                  "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 3 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Think hard") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Think hard")]
         adapter.chat(messages, thinking: "high")
 
         expect(stub).to have_been_requested
@@ -739,13 +765,13 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         thinking_adapter.chat(messages)
 
         expect(stub).to have_been_requested
@@ -767,13 +793,13 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         thinking_adapter.chat(messages, thinking: "low")
 
         expect(stub).to have_been_requested
@@ -788,14 +814,17 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
-        adapter.chat(messages)
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        # Explicitly disable thinking for this single call. The default adapter
+        # is constructed with thinking: "high", so we must pass thinking: nil
+        # per-call to suppress reasoning_effort.
+        adapter.chat(messages, thinking: nil)
 
         expect(stub).to have_been_requested
       end
@@ -807,7 +836,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       end
 
       it "raises ArgumentError for invalid per-call thinking level" do
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         expect do
           adapter.chat(messages, thinking: "extreme")
         end.to raise_error(ArgumentError, /Invalid thinking level/)
@@ -829,14 +858,204 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           .to_return(
             status: 200,
             body: JSON.generate({
-                                  "choices" => [ { "message" => { "content" => "ok" }, "finish_reason" => "stop" } ],
+                                  "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
                                   "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                 }),
             headers: { "Content-Type" => "application/json" }
           )
 
-        messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
         thinking_adapter.chat(messages, thinking: nil)
+
+        expect(stub).to have_been_requested
+      end
+    end
+  end
+
+  describe "X-Initiator header (premium request billing)" do
+    # GitHub Copilot only bills requests sent with `X-Initiator: user` as
+    # premium requests. Continuations inside a tool/agent loop must be sent
+    # with `X-Initiator: agent` to avoid being billed.
+    #
+    # This adapter uses the "savings" strategy: the very first send for a
+    # conversation (only system + user) is `user`; every subsequent send
+    # (containing any assistant or tool message) is `agent`.
+
+    let(:ok_response) do
+      {
+        status: 200,
+        body: JSON.generate({
+                              "choices" => [{ "message" => { "content" => "ok" }, "finish_reason" => "stop" }],
+                              "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
+                            }),
+        headers: { "Content-Type" => "application/json" }
+      }
+    end
+
+    it "sends X-Initiator: user for the first request (user message only)" do
+      stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+             .with(headers: { "X-Initiator" => "user" })
+             .to_return(**ok_response)
+
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+      adapter.chat(messages)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends X-Initiator: user when only a system + user message are present" do
+      stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+             .with(headers: { "X-Initiator" => "user" })
+             .to_return(**ok_response)
+
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+      adapter.chat(messages, system: "You are a helpful assistant.")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends X-Initiator: agent when sending a tool result back to the model" do
+      # The classic agent-loop continuation: prior assistant tool_use +
+      # current tool_result. This MUST NOT be billed as premium.
+      tool_use = Dispatch::Adapter::ToolUseBlock.new(
+        id: "call_1", name: "get_weather", arguments: { "city" => "NYC" }
+      )
+      tool_result = Dispatch::Adapter::ToolResultBlock.new(
+        tool_use_id: "call_1", content: "72F and sunny"
+      )
+
+      messages = [
+        Dispatch::Adapter::Message.new(role: "user", content: "What's the weather?"),
+        Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+        Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
+      ]
+
+      stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+             .with(headers: { "X-Initiator" => "agent" })
+             .to_return(**ok_response)
+
+      adapter.chat(messages)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends X-Initiator: agent when an assistant text turn is present (multi-turn)" do
+      # Savings semantics: any prior assistant turn in history flips this to
+      # `agent`, even if the latest message is a fresh user prompt. This is
+      # intentional and more aggressive than VS Code.
+      messages = [
+        Dispatch::Adapter::Message.new(role: "user", content: "Hi"),
+        Dispatch::Adapter::Message.new(role: "assistant", content: "Hello!"),
+        Dispatch::Adapter::Message.new(role: "user", content: "And again?")
+      ]
+
+      stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+             .with(headers: { "X-Initiator" => "agent" })
+             .to_return(**ok_response)
+
+      adapter.chat(messages)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends codecompanion-equivalent fingerprint headers alongside X-Initiator" do
+      # We mimic codecompanion.nvim's wire profile exactly:
+      #   Copilot-Integration-Id: vscode-chat
+      #   Editor-Version: Neovim/<version>
+      #   X-Initiator: user|agent
+      # We DO NOT send Openai-Intent (codecompanion does not).
+      stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+             .with(headers: {
+                     "Copilot-Integration-Id" => "vscode-chat",
+                     "Editor-Version" => "Neovim/0.10.4",
+                     "X-Initiator" => "user"
+                   })
+             .to_return(**ok_response)
+
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+      adapter.chat(messages)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "does not send the Openai-Intent header (codecompanion parity)" do
+      captured_headers = nil
+      stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+        .with do |req|
+          captured_headers = req.headers
+          true
+        end
+        .to_return(**ok_response)
+
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+      adapter.chat(messages)
+
+      expect(captured_headers.keys.map(&:downcase)).not_to include("openai-intent")
+    end
+
+    it "allows overriding Editor-Version via constructor" do
+      custom_adapter = described_class.new(
+        model: "gpt-4.1",
+        github_token: github_token,
+        max_tokens: 4096,
+        min_request_interval: 0,
+        editor_version: "Neovim/0.12.1"
+      )
+
+      stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+             .with(headers: { "Editor-Version" => "Neovim/0.12.1" })
+             .to_return(**ok_response)
+
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+      custom_adapter.chat(messages)
+
+      expect(stub).to have_been_requested
+    end
+
+    context "in streaming mode" do
+      let(:sse_ok) do
+        {
+          status: 200,
+          body: [
+            "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => "ok" }, "index" => 0 }] })}\n\n",
+            "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }],
+                                     "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 } })}\n\n",
+            "data: [DONE]\n\n"
+          ].join,
+          headers: { "Content-Type" => "text/event-stream" }
+        }
+      end
+
+      it "sends X-Initiator: user for the initial streaming request" do
+        stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+               .with(headers: { "X-Initiator" => "user" })
+               .to_return(**sse_ok)
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        adapter.chat(messages, stream: true) { |_d| }
+
+        expect(stub).to have_been_requested
+      end
+
+      it "sends X-Initiator: agent for streaming tool-result continuations" do
+        tool_use = Dispatch::Adapter::ToolUseBlock.new(
+          id: "call_1", name: "search", arguments: { "q" => "x" }
+        )
+        tool_result = Dispatch::Adapter::ToolResultBlock.new(
+          tool_use_id: "call_1", content: "result"
+        )
+
+        messages = [
+          Dispatch::Adapter::Message.new(role: "user", content: "search x"),
+          Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+          Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
+        ]
+
+        stub = stub_request(:post, "https://api.githubcopilot.com/chat/completions")
+               .with(headers: { "X-Initiator" => "agent" })
+               .to_return(**sse_ok)
+
+        adapter.chat(messages, stream: true) { |_d| }
 
         expect(stub).to have_been_requested
       end
@@ -846,9 +1065,9 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
   describe "#chat with streaming" do
     it "yields StreamDelta objects and returns Response" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [ { "delta" => { "content" => "Hello" }, "index" => 0 } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ { "delta" => { "content" => " world" }, "index" => 0 } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ { "delta" => {}, "index" => 0, "finish_reason" => "stop" } ],
+        "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => "Hello" }, "index" => 0 }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => " world" }, "index" => 0 }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }],
                                  "usage" => { "prompt_tokens" => 5, "completion_tokens" => 2 } })}\n\n",
         "data: [DONE]\n\n"
       ].join
@@ -861,7 +1080,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           headers: { "Content-Type" => "text/event-stream" }
         )
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       deltas = []
       response = adapter.chat(messages, stream: true) { |delta| deltas << delta }
 
@@ -878,20 +1097,20 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
     it "yields tool_use_start and tool_use_delta for tool call streams" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 0, "id" => "call_1", "type" => "function",
-                                                                 "function" => { "name" => "search", "arguments" => "" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 0,
-                                                                 "function" => { "arguments" => "{\"q\":" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 0,
-                                                                 "function" => { "arguments" => "\"test\"}" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ { "delta" => {}, "index" => 0,
-                                                 "finish_reason" => "tool_calls" } ] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0, "id" => "call_1", "type" => "function",
+                                                                 "function" => { "name" => "search", "arguments" => "" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0,
+                                                                 "function" => { "arguments" => "{\"q\":" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0,
+                                                                 "function" => { "arguments" => "\"test\"}" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0,
+                                                 "finish_reason" => "tool_calls" }] })}\n\n",
         "data: [DONE]\n\n"
       ].join
 
@@ -902,7 +1121,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           headers: { "Content-Type" => "text/event-stream" }
         )
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "search") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "search")]
       deltas = []
       response = adapter.chat(messages, stream: true) { |delta| deltas << delta }
 
@@ -923,8 +1142,8 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
     it "captures usage from streaming response" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [ { "delta" => { "content" => "hi" }, "index" => 0 } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ { "delta" => {}, "index" => 0, "finish_reason" => "stop" } ],
+        "data: #{JSON.generate({ "choices" => [{ "delta" => { "content" => "hi" }, "index" => 0 }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0, "finish_reason" => "stop" }],
                                  "usage" => { "prompt_tokens" => 42, "completion_tokens" => 7 } })}\n\n",
         "data: [DONE]\n\n"
       ].join
@@ -936,7 +1155,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           headers: { "Content-Type" => "text/event-stream" }
         )
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       response = adapter.chat(messages, stream: true) { |_delta| nil }
 
       expect(response.usage.input_tokens).to eq(42)
@@ -945,31 +1164,31 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
 
     it "handles multiple parallel tool calls in a stream" do
       sse_body = [
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 0, "id" => "call_a", "type" => "function",
-                                                                 "function" => { "name" => "tool_a", "arguments" => "" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 1, "id" => "call_b", "type" => "function",
-                                                                 "function" => { "name" => "tool_b", "arguments" => "" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 0,
-                                                                 "function" => { "arguments" => "{\"x\":1}" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ {
-                                 "delta" => { "tool_calls" => [ { "index" => 1,
-                                                                 "function" => { "arguments" => "{\"y\":2}" } } ] }, "index" => 0
-                               } ] })}\n\n",
-        "data: #{JSON.generate({ "choices" => [ { "delta" => {}, "index" => 0,
-                                                 "finish_reason" => "tool_calls" } ] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0, "id" => "call_a", "type" => "function",
+                                                                 "function" => { "name" => "tool_a", "arguments" => "" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 1, "id" => "call_b", "type" => "function",
+                                                                 "function" => { "name" => "tool_b", "arguments" => "" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 0,
+                                                                 "function" => { "arguments" => "{\"x\":1}" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{
+                                 "delta" => { "tool_calls" => [{ "index" => 1,
+                                                                 "function" => { "arguments" => "{\"y\":2}" } }] }, "index" => 0
+                               }] })}\n\n",
+        "data: #{JSON.generate({ "choices" => [{ "delta" => {}, "index" => 0,
+                                                 "finish_reason" => "tool_calls" }] })}\n\n",
         "data: [DONE]\n\n"
       ].join
 
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 200, body: sse_body, headers: { "Content-Type" => "text/event-stream" })
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "do both") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "do both")]
       deltas = []
       response = adapter.chat(messages, stream: true) { |d| deltas << d }
 
@@ -999,14 +1218,14 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
                   .to_return(
                     status: 200,
                     body: JSON.generate({
-                                          "choices" => [ { "message" => { "content" => "ok" },
-                                                          "finish_reason" => "stop" } ],
+                                          "choices" => [{ "message" => { "content" => "ok" },
+                                                          "finish_reason" => "stop" }],
                                           "usage" => { "prompt_tokens" => 5, "completion_tokens" => 1 }
                                         }),
                     headers: { "Content-Type" => "application/json" }
                   )
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       adapter.chat(messages)
       adapter.chat(messages)
 
@@ -1025,7 +1244,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
         )
 
       fresh_adapter = described_class.new(model: "gpt-4.1", github_token: "bad_token", max_tokens: 4096)
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
 
       expect { fresh_adapter.chat(messages) }.to raise_error(Dispatch::Adapter::AuthenticationError)
     end
@@ -1277,7 +1496,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 401, body: JSON.generate({ "error" => { "message" => "Unauthorized" } }))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::AuthenticationError) { |e|
         expect(e.status_code).to eq(401)
         expect(e.provider).to eq("GitHub Copilot")
@@ -1288,7 +1507,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 403, body: JSON.generate({ "error" => { "message" => "Forbidden" } }))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::AuthenticationError)
     end
 
@@ -1300,7 +1519,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
           headers: { "Retry-After" => "30" }
         )
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::RateLimitError) { |e|
         expect(e.status_code).to eq(429)
         expect(e.retry_after).to eq(30)
@@ -1311,7 +1530,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 400, body: JSON.generate({ "error" => { "message" => "Bad request" } }))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::RequestError) { |e|
         expect(e.status_code).to eq(400)
       }
@@ -1321,7 +1540,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 422, body: JSON.generate({ "error" => { "message" => "Unprocessable" } }))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::RequestError)
     end
 
@@ -1329,7 +1548,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 500, body: JSON.generate({ "error" => { "message" => "Internal error" } }))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::ServerError) { |e|
         expect(e.status_code).to eq(500)
       }
@@ -1339,7 +1558,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 502, body: "Bad Gateway")
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::ServerError)
     end
 
@@ -1347,7 +1566,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_return(status: 503, body: "Service Unavailable")
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::ServerError)
     end
 
@@ -1355,7 +1574,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_raise(Errno::ECONNREFUSED.new("Connection refused"))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::ConnectionError) { |e|
         expect(e.provider).to eq("GitHub Copilot")
       }
@@ -1365,7 +1584,7 @@ expect(Dispatch::Adapter::Copilot::VERSION).to eq("0.3.0")
       stub_request(:post, "https://api.githubcopilot.com/chat/completions")
         .to_raise(Net::OpenTimeout.new("execution expired"))
 
-      messages = [ Dispatch::Adapter::Message.new(role: "user", content: "Hi") ]
+      messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::ConnectionError)
     end
   end
