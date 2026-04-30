@@ -25,7 +25,8 @@ Gem::Specification.new do |spec|
       (f == gemspec) ||
         f.start_with?(*%w[bin/ Gemfile .gitignore .rspec spec/ .rubocop.yml])
     end
-  end.select { |f| File.exist?(File.join(__dir__, f)) }
+  end
+  spec.files.select! { |f| File.exist?(File.join(__dir__, f)) }
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]

@@ -1588,4 +1588,434 @@ RSpec.describe Dispatch::Adapter::Copilot do
       expect { adapter.chat(messages) }.to raise_error(Dispatch::Adapter::ConnectionError)
     end
   end
+
+  describe "#chat via /v1/responses (reasoning models)" do
+    let(:responses_adapter) do
+      described_class.new(
+        model: "gpt-5.4",
+        github_token: github_token,
+        max_tokens: 4096,
+        thinking: "medium",
+        min_request_interval: 0
+      )
+    end
+
+    # Helper: build a well-formed /v1/responses non-streaming response body.
+    def responses_body(text: nil, tool_calls: [], model: "gpt-5.4",
+                       input_tokens: 10, output_tokens: 5)
+      output = []
+      unless text.nil?
+        output << {
+          "type" => "message",
+          "id" => "msg_001",
+          "role" => "assistant",
+          "content" => [{ "type" => "output_text", "text" => text }]
+        }
+      end
+      tool_calls.each do |tc|
+        output << {
+          "type" => "function_call",
+          "id" => tc[:id],
+          "call_id" => tc[:id],
+          "name" => tc[:name],
+          "arguments" => JSON.generate(tc[:arguments])
+        }
+      end
+      {
+        "id" => "resp_001",
+        "object" => "response",
+        "model" => model,
+        "output" => output,
+        "usage" => {
+          "input_tokens" => input_tokens,
+          "output_tokens" => output_tokens,
+          "total_tokens" => input_tokens + output_tokens
+        }
+      }
+    end
+
+    context "with a text-only response" do
+      before do
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .to_return(
+            status: 200,
+            body: JSON.generate(responses_body(text: "Hello from GPT-5!")),
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "returns a Response with content" do
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        response = responses_adapter.chat(messages)
+
+        expect(response).to be_a(Dispatch::Adapter::Response)
+        expect(response.content).to eq("Hello from GPT-5!")
+        expect(response.tool_calls).to be_empty
+        expect(response.model).to eq("gpt-5.4")
+        expect(response.stop_reason).to eq(:end_turn)
+        expect(response.usage.input_tokens).to eq(10)
+        expect(response.usage.output_tokens).to eq(5)
+      end
+    end
+
+    context "with a tool call response" do
+      before do
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .to_return(
+            status: 200,
+            body: JSON.generate(responses_body(
+                                  tool_calls: [{ id: "call_abc", name: "get_weather",
+                                                 arguments: { "city" => "New York" } }]
+                                )),
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "returns a Response with tool_calls as ToolUseBlock array" do
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Weather?")]
+        response = responses_adapter.chat(messages)
+
+        expect(response.content).to be_nil
+        expect(response.stop_reason).to eq(:tool_use)
+        expect(response.tool_calls.size).to eq(1)
+
+        tc = response.tool_calls.first
+        expect(tc).to be_a(Dispatch::Adapter::ToolUseBlock)
+        expect(tc.id).to eq("call_abc")
+        expect(tc.name).to eq("get_weather")
+        expect(tc.arguments).to eq({ "city" => "New York" })
+      end
+    end
+
+    context "with mixed text + tool call response" do
+      before do
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .to_return(
+            status: 200,
+            body: JSON.generate(responses_body(
+                                  text: "Let me check.",
+                                  tool_calls: [{ id: "call_def", name: "search", arguments: { "q" => "test" } }]
+                                )),
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "returns both content and tool_calls" do
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Search")]
+        response = responses_adapter.chat(messages)
+
+        expect(response.content).to eq("Let me check.")
+        expect(response.tool_calls.size).to eq(1)
+        expect(response.stop_reason).to eq(:tool_use)
+      end
+    end
+
+    context "request body shape" do
+      it "sends `input` not `messages`" do
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body.key?("input") && !body.key?("messages")
+               end
+               .to_return(
+                 status: 200,
+                 body: JSON.generate(responses_body(text: "ok")),
+                 headers: { "Content-Type" => "application/json" }
+               )
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        responses_adapter.chat(messages)
+
+        expect(stub).to have_been_requested
+      end
+
+      it "sends `max_output_tokens` not `max_tokens`" do
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["max_output_tokens"] == 4096 &&
+                   !body.key?("max_tokens") &&
+                   !body.key?("max_completion_tokens")
+               end
+               .to_return(
+                 status: 200,
+                 body: JSON.generate(responses_body(text: "ok")),
+                 headers: { "Content-Type" => "application/json" }
+               )
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        responses_adapter.chat(messages)
+
+        expect(stub).to have_been_requested
+      end
+
+      it "sends `reasoning: {effort:}` not `reasoning_effort`" do
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["reasoning"] == { "effort" => "medium" } && !body.key?("reasoning_effort")
+               end
+               .to_return(
+                 status: 200,
+                 body: JSON.generate(responses_body(text: "ok")),
+                 headers: { "Content-Type" => "application/json" }
+               )
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        responses_adapter.chat(messages)
+
+        expect(stub).to have_been_requested
+      end
+
+      it "sends tools without the `function` wrapper" do
+        tool = Dispatch::Adapter::ToolDefinition.new(
+          name: "get_weather",
+          description: "Get weather",
+          parameters: { "type" => "object", "properties" => { "city" => { "type" => "string" } } }
+        )
+
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 t = body["tools"]&.first
+                 t && t["type"] == "function" &&
+                   t["name"] == "get_weather" &&
+                   t["description"] == "Get weather" &&
+                   !t.key?("function")
+               end
+               .to_return(
+                 status: 200,
+                 body: JSON.generate(responses_body(text: "ok")),
+                 headers: { "Content-Type" => "application/json" }
+               )
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "weather?")]
+        responses_adapter.chat(messages, tools: [tool])
+
+        expect(stub).to have_been_requested
+      end
+
+      it "converts tool results to function_call_output items in input" do
+        tool_use = Dispatch::Adapter::ToolUseBlock.new(
+          id: "call_1", name: "search", arguments: { "q" => "ruby" }
+        )
+        tool_result = Dispatch::Adapter::ToolResultBlock.new(
+          tool_use_id: "call_1", content: "some results"
+        )
+
+        messages = [
+          Dispatch::Adapter::Message.new(role: "user", content: "search ruby"),
+          Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+          Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
+        ]
+
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 input = body["input"]
+                 fc = input.find { |i| i["type"] == "function_call" }
+                 fco = input.find { |i| i["type"] == "function_call_output" }
+                 fc && fc["call_id"] == "call_1" && fc["name"] == "search" &&
+                   fco && fco["call_id"] == "call_1" && fco["output"] == "some results"
+               end
+               .to_return(
+                 status: 200,
+                 body: JSON.generate(responses_body(text: "done")),
+                 headers: { "Content-Type" => "application/json" }
+               )
+
+        responses_adapter.chat(messages)
+
+        expect(stub).to have_been_requested
+      end
+    end
+
+    context "with system: parameter" do
+      it "prepends system item at start of input array" do
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with do |req|
+                 body = JSON.parse(req.body)
+                 body["input"].first == { "role" => "system", "content" => "Be concise." }
+               end
+               .to_return(
+                 status: 200,
+                 body: JSON.generate(responses_body(text: "ok")),
+                 headers: { "Content-Type" => "application/json" }
+               )
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        responses_adapter.chat(messages, system: "Be concise.")
+
+        expect(stub).to have_been_requested
+      end
+    end
+
+    context "X-Initiator header" do
+      let(:ok_resp) do
+        {
+          status: 200,
+          body: JSON.generate(responses_body(text: "ok")),
+          headers: { "Content-Type" => "application/json" }
+        }
+      end
+
+      it "sends X-Initiator: user for a fresh user message" do
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with(headers: { "X-Initiator" => "user" })
+               .to_return(**ok_resp)
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        responses_adapter.chat(messages)
+
+        expect(stub).to have_been_requested
+      end
+
+      it "sends X-Initiator: agent when tool results are present" do
+        tool_use = Dispatch::Adapter::ToolUseBlock.new(id: "c1", name: "fn", arguments: {})
+        tool_result = Dispatch::Adapter::ToolResultBlock.new(tool_use_id: "c1", content: "res")
+
+        messages = [
+          Dispatch::Adapter::Message.new(role: "user", content: "go"),
+          Dispatch::Adapter::Message.new(role: "assistant", content: [tool_use]),
+          Dispatch::Adapter::Message.new(role: "user", content: [tool_result])
+        ]
+
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with(headers: { "X-Initiator" => "agent" })
+               .to_return(**ok_resp)
+
+        responses_adapter.chat(messages)
+
+        expect(stub).to have_been_requested
+      end
+    end
+
+    context "error mapping" do
+      it "maps 400 to RequestError (the error gpt-5.4 would give on wrong endpoint)" do
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .to_return(status: 400, body: JSON.generate({ "error" => { "message" => "bad request" } }))
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        expect { responses_adapter.chat(messages) }.to raise_error(Dispatch::Adapter::RequestError)
+      end
+    end
+
+    context "streaming" do
+      def sse_events(*events)
+        all = events.map { |e| "data: #{JSON.generate(e)}\n\n" }
+        all << "data: [DONE]\n\n"
+        all.join
+      end
+
+      it "yields text StreamDeltas and returns Response" do
+        body = sse_events(
+          { "type" => "response.output_item.added", "output_index" => 0,
+            "item" => { "type" => "message", "id" => "msg_001", "role" => "assistant", "content" => [] } },
+          { "type" => "response.output_text.delta", "item_id" => "msg_001",
+            "output_index" => 0, "content_index" => 0, "delta" => "Hello" },
+          { "type" => "response.output_text.delta", "item_id" => "msg_001",
+            "output_index" => 0, "content_index" => 0, "delta" => " world" },
+          { "type" => "response.completed",
+            "response" => { "model" => "gpt-5.4",
+                            "usage" => { "input_tokens" => 10, "output_tokens" => 2, "total_tokens" => 12 } } }
+        )
+
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .with { |req| JSON.parse(req.body)["stream"] == true }
+          .to_return(status: 200, body: body, headers: { "Content-Type" => "text/event-stream" })
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        deltas = []
+        response = responses_adapter.chat(messages, stream: true) { |d| deltas << d }
+
+        text_deltas = deltas.select { |d| d.type == :text_delta }
+        expect(text_deltas.size).to eq(2)
+        expect(text_deltas[0].text).to eq("Hello")
+        expect(text_deltas[1].text).to eq(" world")
+
+        expect(response).to be_a(Dispatch::Adapter::Response)
+        expect(response.content).to eq("Hello world")
+        expect(response.stop_reason).to eq(:end_turn)
+        expect(response.model).to eq("gpt-5.4")
+        expect(response.usage.input_tokens).to eq(10)
+        expect(response.usage.output_tokens).to eq(2)
+      end
+
+      it "yields tool_use_start and tool_use_delta for function call streams" do
+        body = sse_events(
+          { "type" => "response.output_item.added", "output_index" => 0,
+            "item" => { "type" => "function_call", "id" => "fc_001", "call_id" => "call_001",
+                        "name" => "get_weather" } },
+          { "type" => "response.function_call_arguments.delta",
+            "item_id" => "fc_001", "output_index" => 0, "delta" => "{\"city\":" },
+          { "type" => "response.function_call_arguments.delta",
+            "item_id" => "fc_001", "output_index" => 0, "delta" => "\"NYC\"}" },
+          { "type" => "response.completed",
+            "response" => { "model" => "gpt-5.4",
+                            "usage" => { "input_tokens" => 15, "output_tokens" => 8, "total_tokens" => 23 } } }
+        )
+
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .to_return(status: 200, body: body, headers: { "Content-Type" => "text/event-stream" })
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "weather?")]
+        deltas = []
+        response = responses_adapter.chat(messages, stream: true) { |d| deltas << d }
+
+        starts = deltas.select { |d| d.type == :tool_use_start }
+        arg_deltas = deltas.select { |d| d.type == :tool_use_delta }
+
+        expect(starts.size).to eq(1)
+        expect(starts.first.tool_call_id).to eq("call_001")
+        expect(starts.first.tool_name).to eq("get_weather")
+
+        expect(arg_deltas.size).to eq(2)
+        expect(arg_deltas[0].argument_delta).to eq("{\"city\":")
+        expect(arg_deltas[1].argument_delta).to eq("\"NYC\"}")
+
+        expect(response.stop_reason).to eq(:tool_use)
+        expect(response.tool_calls.size).to eq(1)
+        expect(response.tool_calls.first.name).to eq("get_weather")
+        expect(response.tool_calls.first.arguments).to eq({ "city" => "NYC" })
+        expect(response.usage.input_tokens).to eq(15)
+        expect(response.usage.output_tokens).to eq(8)
+      end
+
+      it "sends stream: true in the request body" do
+        body = sse_events(
+          { "type" => "response.completed",
+            "response" => { "model" => "gpt-5.4", "usage" => { "input_tokens" => 5, "output_tokens" => 1 } } }
+        )
+
+        stub = stub_request(:post, "https://api.githubcopilot.com/responses")
+               .with { |req| JSON.parse(req.body)["stream"] == true }
+               .to_return(status: 200, body: body, headers: { "Content-Type" => "text/event-stream" })
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "Hi")]
+        responses_adapter.chat(messages, stream: true) { |_d| }
+
+        expect(stub).to have_been_requested
+      end
+
+      it "returns nil content when there are no text deltas" do
+        body = sse_events(
+          { "type" => "response.output_item.added", "output_index" => 0,
+            "item" => { "type" => "function_call", "id" => "fc_001", "call_id" => "call_001", "name" => "fn" } },
+          { "type" => "response.function_call_arguments.delta",
+            "item_id" => "fc_001", "output_index" => 0, "delta" => "{}" },
+          { "type" => "response.completed",
+            "response" => { "model" => "gpt-5.4", "usage" => { "input_tokens" => 5, "output_tokens" => 1 } } }
+        )
+
+        stub_request(:post, "https://api.githubcopilot.com/responses")
+          .to_return(status: 200, body: body, headers: { "Content-Type" => "text/event-stream" })
+
+        messages = [Dispatch::Adapter::Message.new(role: "user", content: "do it")]
+        response = responses_adapter.chat(messages, stream: true) { |_d| }
+
+        expect(response.content).to be_nil
+        expect(response.tool_calls.size).to eq(1)
+      end
+    end
+  end
 end

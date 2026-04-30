@@ -47,3 +47,7 @@ Style/Documentation:
 
 Style/RedundantStructKeywordInit:
   Enabled: false
+
+Lint/EmptyBlock:
+  Exclude:
+    - "spec/**/*"
